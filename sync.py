@@ -72,8 +72,17 @@ class Sync:
                         log_file.close()
                 shutil.copy(os.path.join(sync_instance.dir_source, value),
                             os.path.join(sync_instance.dir_replica, value))
-            except:
+            except Exception as e:
                 print("encountered an error during copy")
+                if os.path.isfile(log_file_path):
+                    with open(log_file_path, "a") as log_file:
+                        current_datetime = datetime.datetime.now()
+                        log_file.write(f"{current_datetime}: encountered an error during copy {e}.")
+                        log_file.close()
+                else:
+                    with open(log_file_path, "w") as log_file:
+                        current_datetime = datetime.datetime.now()
+                        log_file.write(f"{current_datetime}: encountered an error during copy {e}.")
 
 
     def remove_excess(self):
@@ -93,6 +102,17 @@ class Sync:
                 os.remove(os.path.join(sync_instance.dir_replica, value))
             except Exception as e:
                 print(f"encountered an Error during removal from target folder: {e}")
+                if os.path.isfile(log_file_path):
+                    with open(log_file_path, "a") as log_file:
+                        current_datetime = datetime.datetime.now()
+                        log_file.write(f"{current_datetime}:"
+                                       f" encountered an Error during removal from target folder: {e}.")
+                        log_file.close()
+                else:
+                    with open(log_file_path, "w") as log_file:
+                        current_datetime = datetime.datetime.now()
+                        log_file.write(f"{current_datetime}:"
+                                       f" encountered an Error during removal from target folder: {e}.")
 
 def create_log(self):
     if os.path.isfile(log_file_path):
