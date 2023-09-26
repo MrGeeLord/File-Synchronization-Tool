@@ -33,7 +33,7 @@ To use this script, you need to have Python installed on your system.
 
 ## Customization
 
-You can customize the script by modifying the following parameters in the `scheduler.py` file:
+You can customize the script by modifying the following parameters in the `sync.py` file:
 
 - `block_size`: Adjust the block size for reading files during hashing.
 - Add any additional logic or customizations to the synchronization process within the `Sync` class methods.
