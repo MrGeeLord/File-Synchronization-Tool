@@ -1,10 +1,10 @@
+import datetime
 import hashlib
 import os
 import shutil
-import datetime
-from apscheduler.schedulers.background import BackgroundScheduler
 import time
 
+from apscheduler.schedulers.background import BackgroundScheduler
 
 scheduler = BackgroundScheduler()
 
@@ -53,81 +53,50 @@ class Sync:
     def sync_copy(self):
         for value in self.values():
             try:
-                print(
-                    f"copying {value} from: {os.path.join(sync_instance.dir_source)}"
-                    f" to replica {os.path.join(sync_instance.dir_replica)}")
-                if os.path.isfile(log_file_path):
-                    with open(log_file_path, "a") as log_file:
-                        current_datetime = datetime.datetime.now()
-                        log_file.write(f"{current_datetime}: copying {value}"
-                                       f" from: {os.path.join(sync_instance.dir_source)}"
-                                       f" to replica {os.path.join(sync_instance.dir_replica)}.\n")
-                        log_file.close()
-                else:
-                    with open(log_file_path, "w") as log_file:
-                        current_datetime = datetime.datetime.now()
-                        log_file.write(f"{current_datetime}: copying {value}"
-                                       f" from: {os.path.join(sync_instance.dir_source)}"
-                                       f" to replica {os.path.join(sync_instance.dir_replica)}.\n")
-                        log_file.close()
+                message = (f"copying {value} from: {os.path.join(sync_instance.dir_source)}"
+                           f" to replica {os.path.join(sync_instance.dir_replica)}")
+                print(message)
+                log_to_file(log_file_path, message)
                 shutil.copy(os.path.join(sync_instance.dir_source, value),
                             os.path.join(sync_instance.dir_replica, value))
             except Exception as e:
-                print("encountered an error during copy")
-                if os.path.isfile(log_file_path):
-                    with open(log_file_path, "a") as log_file:
-                        current_datetime = datetime.datetime.now()
-                        log_file.write(f"{current_datetime}: encountered an error during copy {e}.")
-                        log_file.close()
-                else:
-                    with open(log_file_path, "w") as log_file:
-                        current_datetime = datetime.datetime.now()
-                        log_file.write(f"{current_datetime}: encountered an error during copy {e}.")
-
+                current_datetime = datetime.datetime.now()
+                message = (f"{current_datetime}: encountered an error during copy {e}.")
+                print(message)
+                log_to_file(log_file_path, message)
 
     def remove_excess(self):
         for value in self.values():
             try:
                 print(f"delete: {os.path.join(sync_instance.dir_replica, value)}")
-                if os.path.isfile(log_file_path):
-                    with open(log_file_path, "a") as log_file:
-                        current_datetime = datetime.datetime.now()
-                        log_file.write(f"{current_datetime}: removing {value} from: {os.path.join(sync_instance.dir_replica)}.\n")
-                        log_file.close()
-                else:
-                    with open(log_file_path, "w") as log_file:
-                        current_datetime = datetime.datetime.now()
-                        log_file.write(f"{current_datetime}: removing {value} from: {os.path.join(sync_instance.dir_replica)}.\n")
-                        log_file.close()
+                message = (f"delete: {os.path.join(sync_instance.dir_replica, value)}")
+                print(message)
+                log_to_file(log_file_path, message)
                 os.remove(os.path.join(sync_instance.dir_replica, value))
             except Exception as e:
-                print(f"encountered an Error during removal from target folder: {e}")
-                if os.path.isfile(log_file_path):
-                    with open(log_file_path, "a") as log_file:
-                        current_datetime = datetime.datetime.now()
-                        log_file.write(f"{current_datetime}:"
-                                       f" encountered an Error during removal from target folder: {e}.")
-                        log_file.close()
-                else:
-                    with open(log_file_path, "w") as log_file:
-                        current_datetime = datetime.datetime.now()
-                        log_file.write(f"{current_datetime}:"
-                                       f" encountered an Error during removal from target folder: {e}.")
+                current_datetime = datetime.datetime.now()
+                message = f"{current_datetime}: encountered an Error during removal from target folder: {e}."
+                print(message)
+                log_to_file(log_file_path, message)
+
+
+def log_to_file(log_file_path, message):
+    current_datetime = datetime.datetime.now()
+    log_entry = f"{current_datetime}: {message}\n"
+    operation = "a" if os.path.isfile(log_file_path) else "w"
+    with open(log_file_path, operation) as log_file:
+        log_file.write(log_entry)
+        log_file.close()
+
 
 def create_log(self):
-    if os.path.isfile(log_file_path):
-        with open(log_file_path, "a") as log_file:
-            current_datetime = datetime.datetime.now()
-            log_file.write(f"{current_datetime}: Synchronization has been started.\n")
-            log_file.close()
-    else:
-        with open(log_file_path, "w") as log_file:
-            current_datetime = datetime.datetime.now()
-            log_file.write(f"{current_datetime}: Synchronization has been started.\n")
-            log_file.close()
+    current_datetime = datetime.datetime.now()
+    message = f"{current_datetime}: Synchronization has been started."
+    log_to_file(log_file_path, message)
+
 
 if __name__ == "__main__":
-    source_input= input("Please enter path to source folder: ")
+    source_input = input("Please enter path to source folder: ")
     target_input = input("Please enter path to target folder: ")
     sync_instance = Sync(source_input, target_input)
     interval_input = input("Enter the time interval in seconds, minutes, or hours (e.g., '30 seconds', '1 hour'): ")
@@ -137,8 +106,8 @@ if __name__ == "__main__":
     log_file_path = input_log
 
     # sync_instance = Sync("C:\\Users\\GeeLord\\Downloads\\ProcessMonitor", "C:\\Users\\GeeLord\\Downloads\\Nová složka")
-    #
-    # interval_input = "62 seconds"
+
+    # interval_input = "2 seconds"
 
     # Get the current date and time
     # current_datetime = datetime.datetime.now()
@@ -155,39 +124,18 @@ if __name__ == "__main__":
 
         if not source_diff_keys:
             print(source_diff_message)  # Print the message if the dictionary is empty
-            if os.path.isfile(log_file_path):
-                with open(log_file_path, "a") as log_file:
-                    current_datetime = datetime.datetime.now()
-                    log_file.write(
-                        f"{current_datetime}: {source_diff_message}.\n")
-                    log_file.close()
-            else:
-                with open(log_file_path, "w") as log_file:
-                    current_datetime = datetime.datetime.now()
-                    log_file.write(
-                        f"{current_datetime}: {source_diff_message}.\n")
-                    log_file.close()
+            log_to_file(log_file_path, source_diff_message)
         else:
             # print(f"Marked for copy: {source_diff_keys}")
             Sync.sync_copy(source_diff_keys)
 
         if not marked_for_del:
             print(marked_for_del_message)  # Print the message if the dictionary is empty
-            if os.path.isfile(log_file_path):
-                with open(log_file_path, "a") as log_file:
-                    current_datetime = datetime.datetime.now()
-                    log_file.write(
-                        f"{current_datetime}: {marked_for_del_message}.\n")
-                    log_file.close()
-            else:
-                with open(log_file_path, "w") as log_file:
-                    current_datetime = datetime.datetime.now()
-                    log_file.write(
-                        f"{current_datetime}: {marked_for_del_message}.\n")
-                    log_file.close()
+            log_to_file(log_file_path, marked_for_del_message)
         else:
             # print(f"Marked for removal: {marked_for_del}")
             Sync.remove_excess(marked_for_del)
+
 
     sync_job()
 
