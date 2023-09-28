@@ -1,6 +1,6 @@
 # File Synchronization Tool
 
-This Python script is designed to synchronize files between a source directory and a replica directory at regular intervals. It uses the `apscheduler` library to schedule synchronization tasks.
+This Python script is designed to synchronize files between a source directory and a replica directory at regular intervals. It uses the `apscheduler` library to schedule synchronization tasks and MD5 hashing to identify duplicates.
 
 ## Features
 
