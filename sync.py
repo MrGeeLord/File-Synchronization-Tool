@@ -3,7 +3,7 @@ import hashlib
 import os
 import shutil
 import time
-
+from collections import defaultdict
 from apscheduler.schedulers.background import BackgroundScheduler
 
 scheduler = BackgroundScheduler()
@@ -19,31 +19,75 @@ class Sync:
     def __str__(self):
         return f"source: {self.dir_source}\nreplica: {self.dir_replica}"
 
-    def hash_directory(self):
+    def hash_directory(directory):
         block_size = 65536
         hashed_dir = {}
-        for dirpath, dirnames, filenames in os.walk(self):
+        for dirpath, dirnames, filenames in os.walk(directory):
             for filename in filenames:
                 file_hash = hashlib.sha256()
+
                 full_path = os.path.join(dirpath, filename)
                 with open(full_path, 'rb') as f:
                     fb = f.read(block_size)
                     while len(fb) > 0:
                         file_hash.update(fb)
                         fb = f.read(block_size)
-                hashed_dir.update({file_hash.hexdigest(): filename})
+                hashed_dir.update({full_path: file_hash.hexdigest()})
 
         return hashed_dir
 
     def compare(self):
         source_diff_keys = {}
+        source_diff_keys_clones ={}
         marked_for_del = {}
-        for key, value in self.dir_source_hashed.items():
-            if key not in self.dir_replica_hashed:
-                source_diff_keys[key] = value
-        for key, value in self.dir_replica_hashed.items():
-            if key not in self.dir_source_hashed:
-                marked_for_del[key] = value
+        source_keys_rel = {os.path.relpath(key, self.dir_source): value for key, value in
+                           self.dir_source_hashed.items()}
+        replica_keys_rel = {os.path.relpath(key, self.dir_replica): value for key, value in
+                            self.dir_replica_hashed.items()}
+
+        for key, value in source_keys_rel.items():
+            source_diff_keys_clones[os.path.join(self.dir_source, key)] = value
+            if key not in replica_keys_rel:
+                source_diff_keys[os.path.join(self.dir_source, key)] = value
+
+        for key, value in replica_keys_rel.items():
+            if key not in source_keys_rel:
+                marked_for_del[os.path.join(self.dir_replica, key)] = value
+
+        if source_diff_keys_clones is not {}:
+            duplicate_values = defaultdict(list)
+            for key, value in source_diff_keys_clones.items():
+                duplicate_values[value].append(key)
+            for hash_value, file_paths in duplicate_values.items():
+                if len(file_paths) > 1:
+                    # Dictionary to store files grouped by extension and directory name
+                    extension_groups = {}
+
+                    for file_path in file_paths:
+                        # Extract the file extension and directory name
+                        file_extension = os.path.splitext(file_path)[1].lower()
+                        dir_name = os.path.dirname(file_path)
+
+                        # Group files by extension and directory name
+                        key = (file_extension, dir_name)
+                        if key not in extension_groups:
+                            extension_groups[key] = []
+                        extension_groups[key].append(file_path)
+
+                    for (file_extension, dir_name), group_file_paths in extension_groups.items():
+                        if len(group_file_paths) > 1:
+                            # Find the file with the longest filename (without extension)
+                            shorter_file_path = min(group_file_paths,
+                                                    key=lambda x: len(os.path.splitext(os.path.basename(x))[0]))
+                            longest_file_path = max(group_file_paths,
+                                                    key=lambda x: len(os.path.splitext(os.path.basename(x))[0]))
+                            if os.path.splitext(os.path.basename(shorter_file_path))[0] in os.path.splitext(os.path.basename(longest_file_path))[0]:
+
+                                source_diff_keys.pop(longest_file_path)
+
+
+
+
 
         source_diff_message = "All files in source folder are present in target folder" if not source_diff_keys else source_diff_keys
         marked_for_del_message = "All files in target folder are present in source folder" if not marked_for_del else marked_for_del
@@ -51,14 +95,22 @@ class Sync:
         return source_diff_keys, marked_for_del, source_diff_message, marked_for_del_message
 
     def sync_copy(self):
-        for value in self.values():
+        for key in self.keys():
             try:
-                message = (f"copying {value} from: {os.path.join(sync_instance.dir_source)}"
+                message = (f"copying {os.path.basename(key)} from: {os.path.join(sync_instance.dir_replica,os.path.relpath(os.path.normpath(key), sync_instance.dir_source))}"
                            f" to replica {os.path.join(sync_instance.dir_replica)}")
                 print(message)
                 log_to_file(log_file_path, message)
-                shutil.copy(os.path.join(sync_instance.dir_source, value),
-                            os.path.join(sync_instance.dir_replica, value))
+                if os.sep.join(os.path.normpath(key).split(os.sep)[-2:-1]) == os.path.basename(sync_instance.dir_source):
+                    shutil.copy2(os.path.normpath(key), os.path.join(sync_instance.dir_replica, os.path.basename(key)))
+                else:
+                    if os.path.isdir(os.path.dirname(os.path.join(sync_instance.dir_replica,os.path.relpath(os.path.normpath(key), sync_instance.dir_source)))):
+                        shutil.copy2(os.path.normpath(key), os.path.join(sync_instance.dir_replica,os.path.relpath(os.path.normpath(key), sync_instance.dir_source)))
+                    else:
+                        os.makedirs(os.path.dirname(os.path.join(sync_instance.dir_replica,os.path.relpath(os.path.normpath(key), sync_instance.dir_source))))
+                        shutil.copy2(os.path.normpath(key), os.path.join(sync_instance.dir_replica,os.path.relpath(os.path.normpath(key), sync_instance.dir_source)))
+
+
             except Exception as e:
                 current_datetime = datetime.datetime.now()
                 message = (f"{current_datetime}: encountered an error during copy {e}.")
@@ -66,18 +118,26 @@ class Sync:
                 log_to_file(log_file_path, message)
 
     def remove_excess(self):
-        for value in self.values():
+        for key in self.keys():
             try:
-                print(f"delete: {os.path.join(sync_instance.dir_replica, value)}")
-                message = (f"delete: {os.path.join(sync_instance.dir_replica, value)}")
+                message = (f"delete: {os.path.join(sync_instance.dir_replica, key)}")
                 print(message)
                 log_to_file(log_file_path, message)
-                os.remove(os.path.join(sync_instance.dir_replica, value))
+                os.remove(os.path.join(sync_instance.dir_replica, key))
             except Exception as e:
                 current_datetime = datetime.datetime.now()
                 message = f"{current_datetime}: encountered an Error during removal from target folder: {e}."
                 print(message)
                 log_to_file(log_file_path, message)
+        Sync.delete_empty_folders(sync_instance.dir_replica)
+        log_to_file(log_file_path, "removing empty folders from target folder.")
+
+    def delete_empty_folders(self):
+        for dirpath, dirnames, filenames in os.walk(self, topdown=False):
+            for dirname in dirnames:
+                full_path = os.path.join(dirpath, dirname)
+                if not os.listdir(full_path):
+                    os.rmdir(full_path)
 
 
 def log_to_file(log_file_path, message):
@@ -101,22 +161,18 @@ if __name__ == "__main__":
     sync_instance = Sync(source_input, target_input)
     interval_input = input("Enter the time interval in seconds, minutes, or hours (e.g., '30 seconds', '1 hour'): ")
     input_log = input("Please enter logfile path: ") + "\\" + "sync.log"
-
-    # input_log = "C:\\Users\\GeeLord\\PycharmProjects\\veeam_task\\sync.log"
     log_file_path = input_log
 
+    # log_file_path = "C:\\Users\\GeeLord\\PycharmProjects\\veeam_task\\sync.log"
     # sync_instance = Sync("C:\\Users\\GeeLord\\Downloads\\ProcessMonitor", "C:\\Users\\GeeLord\\Downloads\\Nová složka")
-
     # interval_input = "2 seconds"
-
-    # Get the current date and time
-    # current_datetime = datetime.datetime.now()
 
     create_log(input_log)
 
 
     def sync_job():
-        # sync_instance = Sync("C:\\Users\\GeeLord\\Downloads\\ProcessMonitor", "C:\\Users\\GeeLord\\Downloads\\Nová složka")
+        # sync_instance = Sync("C:\\Users\\GeeLord\\Downloads\\ProcessMonitor",
+        #                      "C:\\Users\\GeeLord\\Downloads\\Nová složka")
         sync_instance = Sync(source_input, target_input)
         results = sync_instance.compare()
 
