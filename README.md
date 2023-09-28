@@ -6,7 +6,7 @@ This Python script is designed to synchronize files between a source directory a
 
 - Synchronize files from a source directory to a replica directory.
 - Compare the contents of the source and replica directories to identify differences.
-- Copy new files from the source to the replica.
+- Copy new files from the source to the replica. This script doesn't allow copies of a file  in same folder (file with same content but with a different filename will not be copied). 
 - Remove excess files from the replica directory.
 - Log synchronization actions with timestamps.
 
