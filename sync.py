@@ -155,13 +155,35 @@ def create_log(self):
     log_to_file(log_file_path, message)
 
 
+def path_validity_check(message):
+    while True:
+        data = input(f"{message}")
+        if not os.path.isdir(data):
+            print("Inputed folder doesn't exist")
+            continue
+        else:
+            break
+    return data
+
+
+def interval_validity(message):
+    while True:
+        data = input(f"{message}")
+        words = data.lower().split()
+        if len(words) < 2 or (words[1] not in ('second', 'hour', 'seconds', 'hours')):
+            print(f"{data} is not a valid input")
+        else:
+            break
+    return data
+
 if __name__ == "__main__":
-    source_input = input("Please enter path to source folder: ")
-    target_input = input("Please enter path to target folder: ")
+    source_input = path_validity_check("Please enter path to source folder: ")
+    target_input = path_validity_check("Please enter path to target folder: ")
     sync_instance = Sync(source_input, target_input)
-    interval_input = input("Enter the time interval in seconds, minutes, or hours (e.g., '30 seconds', '1 hour'): ")
-    input_log = input("Please enter logfile path: ") + "\\" + "sync.log"
+    interval_input = interval_validity("Enter the time interval in seconds, minutes, or hours (e.g., '30 seconds', '1 hour'): ")
+    input_log = path_validity_check("Please enter logfile path: ") + "\\" + "sync.log"
     log_file_path = input_log
+
 
     # log_file_path = "C:\\Users\\GeeLord\\PycharmProjects\\veeam_task\\sync.log"
     # sync_instance = Sync("C:\\Users\\GeeLord\\Downloads\\ProcessMonitor", "C:\\Users\\GeeLord\\Downloads\\Nová složka")
