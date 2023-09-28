@@ -4,6 +4,7 @@ import os
 import shutil
 import time
 from collections import defaultdict
+
 from apscheduler.schedulers.background import BackgroundScheduler
 
 scheduler = BackgroundScheduler()
@@ -38,7 +39,7 @@ class Sync:
 
     def compare(self):
         source_diff_keys = {}
-        source_diff_keys_clones ={}
+        source_diff_keys_clones = {}
         marked_for_del = {}
         source_keys_rel = {os.path.relpath(key, self.dir_source): value for key, value in
                            self.dir_source_hashed.items()}
@@ -81,13 +82,15 @@ class Sync:
                                                     key=lambda x: len(os.path.splitext(os.path.basename(x))[0]))
                             longest_file_path = max(group_file_paths,
                                                     key=lambda x: len(os.path.splitext(os.path.basename(x))[0]))
-                            if os.path.splitext(os.path.basename(shorter_file_path))[0] in os.path.splitext(os.path.basename(longest_file_path))[0]:
-
-                                source_diff_keys.pop(longest_file_path)
-
-
-
-
+                            if (os.path.splitext(os.path.basename(shorter_file_path))[0] in
+                                    os.path.splitext(os.path.basename(longest_file_path))[0]):
+                                try:
+                                    source_diff_keys.pop(longest_file_path)
+                                except:
+                                    message = f"Error when trying ignore duplicate file {longest_file_path}"
+                                    print(message)
+                                    log_to_file(log_file_path, message)
+                                    continue
 
         source_diff_message = "All files in source folder are present in target folder" if not source_diff_keys else source_diff_keys
         marked_for_del_message = "All files in target folder are present in source folder" if not marked_for_del else marked_for_del
@@ -97,30 +100,34 @@ class Sync:
     def sync_copy(self):
         for key in self.keys():
             try:
-                message = (f"copying {os.path.basename(key)} from: {os.path.join(sync_instance.dir_replica,os.path.relpath(os.path.normpath(key), sync_instance.dir_source))}"
-                           f" to replica {os.path.join(sync_instance.dir_replica)}")
+                dir_replica = sync_instance.dir_replica
+                dir_source = sync_instance.dir_source
+                full_path = os.path.normpath(key)
+                message = (
+                    f"copying {os.path.basename(key)} from: {os.path.join(dir_replica, os.path.relpath(full_path, dir_source))}"
+                    f" to replica {os.path.join(dir_replica)}")
                 print(message)
                 log_to_file(log_file_path, message)
-                if os.sep.join(os.path.normpath(key).split(os.sep)[-2:-1]) == os.path.basename(sync_instance.dir_source):
-                    shutil.copy2(os.path.normpath(key), os.path.join(sync_instance.dir_replica, os.path.basename(key)))
+                if os.sep.join(full_path.split(os.sep)[-2:-1]) == os.path.basename(dir_source):
+                    shutil.copy2(full_path, os.path.join(dir_replica, os.path.basename(key)))
                 else:
-                    if os.path.isdir(os.path.dirname(os.path.join(sync_instance.dir_replica,os.path.relpath(os.path.normpath(key), sync_instance.dir_source)))):
-                        shutil.copy2(os.path.normpath(key), os.path.join(sync_instance.dir_replica,os.path.relpath(os.path.normpath(key), sync_instance.dir_source)))
+                    if os.path.isdir(os.path.dirname(os.path.join(dir_replica, os.path.relpath(full_path, dir_source)))):
+                        shutil.copy2(full_path, os.path.join(dir_replica, os.path.relpath(full_path, dir_source)))
                     else:
-                        os.makedirs(os.path.dirname(os.path.join(sync_instance.dir_replica,os.path.relpath(os.path.normpath(key), sync_instance.dir_source))))
-                        shutil.copy2(os.path.normpath(key), os.path.join(sync_instance.dir_replica,os.path.relpath(os.path.normpath(key), sync_instance.dir_source)))
+                        os.makedirs(os.path.dirname(os.path.join(dir_replica, os.path.relpath(full_path, dir_source))))
+                        shutil.copy2(full_path, os.path.join(dir_replica, os.path.relpath(full_path, dir_source)))
 
 
             except Exception as e:
                 current_datetime = datetime.datetime.now()
-                message = (f"{current_datetime}: encountered an error during copy {e}.")
+                message = f"{current_datetime}: encountered an error during copy {e}."
                 print(message)
                 log_to_file(log_file_path, message)
 
     def remove_excess(self):
         for key in self.keys():
             try:
-                message = (f"delete: {os.path.join(sync_instance.dir_replica, key)}")
+                message = f"delete: {os.path.join(sync_instance.dir_replica, key)}"
                 print(message)
                 log_to_file(log_file_path, message)
                 os.remove(os.path.join(sync_instance.dir_replica, key))
@@ -176,14 +183,15 @@ def interval_validity(message):
             break
     return data
 
+
 if __name__ == "__main__":
     source_input = path_validity_check("Please enter path to source folder: ")
     target_input = path_validity_check("Please enter path to target folder: ")
     sync_instance = Sync(source_input, target_input)
-    interval_input = interval_validity("Enter the time interval in seconds, minutes, or hours (e.g., '30 seconds', '1 hour'): ")
+    interval_input = interval_validity(
+        "Enter the time interval in seconds, minutes, or hours (e.g., '30 seconds', '1 hour'): ")
     input_log = path_validity_check("Please enter logfile path: ") + "\\" + "sync.log"
     log_file_path = input_log
-
 
     # log_file_path = "C:\\Users\\GeeLord\\PycharmProjects\\veeam_task\\sync.log"
     # sync_instance = Sync("C:\\Users\\GeeLord\\Downloads\\ProcessMonitor", "C:\\Users\\GeeLord\\Downloads\\Nová složka")
